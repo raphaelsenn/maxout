@@ -37,6 +37,9 @@ class MaxOutMLP(nn.Module):
 
 
 # TODO: implemnt maxout for convolutional neural networks
-class MaxOutConv(nn.Module):
+class MaxOutConv2d(nn.Module):
     def __init__(self) -> None:
-        pass
+        super().__init__()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = torch.max(x, dim=0)
