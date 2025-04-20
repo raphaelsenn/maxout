@@ -1,5 +1,5 @@
 # maxout
-PyTorch implementation of the "Maxout unit/activation" described in the paper "Maxout Networks".
+PyTorch implementation of the "Maxout unit/activation" described in the paper [Maxout Networks](https://arxiv.org/abs/1302.4389).
 
 ## The Maxout Unit
 Maxout units devide the input $x \in \mathbb{R}^d$ into groups of $k \in \mathbb{N}$ values. Each maxout unit then outputs the maximum element of one of these groups:
@@ -9,6 +9,7 @@ Maxout units devide the input $x \in \mathbb{R}^d$ into groups of $k \in \mathbb
 ## Usage
 
 ```python
+import torch
 from maxout.maxout import Maxout
 
 
