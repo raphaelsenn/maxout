@@ -7,17 +7,18 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from torchvision.datasets import MNIST, CIFAR10
 
-from experiment_models.mnist import NetMNIST
+from experiments.neural_networks import MaxoutMLP
 
-from experiment_models.helpers import MaxNorm   # max-norm constraint
-
+from experiments.helpers import MaxNorm   # max-norm constraint
+from experiments.helpers import load_cifar10, load_mnist
 
 # -----------------------------------------------------------------------------
 # settings
 # -----------------------------------------------------------------------------
 DATASET = 'mnist'                 # mnist or cifar-10
+ROOT_DATA = DATASET + '/'
 
-lr = 0.001                         # learning rate
+lr = 0.01                         # learning rate
 momentum = 0.95                     # momentum
 epochs = 4                          # number of iterations
 batch_size = 64                     # batch size
@@ -25,7 +26,7 @@ seed = 42                           # random seed for reproducability
 
 verbose = True                      # printing error/acc while training
 num_threads = 10                    # number of threads 
-device = torch.device('cpu')        # computing device i.e. cpu or cuda
+device = torch.device('mps')        # computing device i.e. cpu or cuda
 
 torch.manual_seed(seed)
 torch.set_num_threads(num_threads)
@@ -62,7 +63,7 @@ def train(
     
     optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=momentum)
     criterion = nn.CrossEntropyLoss()
-    maxnorm = MaxNorm(max_value=4)
+    maxnorm = MaxNorm(max_value=2)
 
     # for epoch in range(epochs):
     for epoch in range(epochs):
@@ -93,7 +94,7 @@ def train(
             optimizer.step()
 
             # apply max-norm constraint
-            model.apply(maxnorm)
+            # model.apply(maxnorm)
 
         end_time = time.monotonic()
         
@@ -111,51 +112,13 @@ if __name__ == '__main__':
         device = torch.device('mps')
  
     if DATASET == 'mnist':  # training on minst
-        model = NetMNIST()
-
-        # loading and transforming the mnist dataset
-        transform = transforms.Compose(
-            [transforms.ToTensor(),                     # greyscale [0, 255] -> [0, 1]
-            transforms.Lambda(lambda x: x.view(-1))])   # shape [1, 28, 28] -> [1, 784]
-
-        mnist_train = MNIST(
-            root='mnist/',
-            train=True,
-            download=True,
-            transform=transform)
-        
-        mnist_test = MNIST(
-            root='mnist/',
-            train=False,
-            download=True,
-            transform=transform)
-        
-        dataloader_train = DataLoader(mnist_train, batch_size=batch_size, shuffle=True)
-        dataloader_test = DataLoader(mnist_test, batch_size=batch_size, shuffle=True)
+        model = MaxoutMLP()
+        dataloader_train, dataloader_test = load_mnist(ROOT_DATA)
 
     else: # training on cifar10
-        
-        transform = transforms.Compose(
-            [transforms.ToTensor(),
-             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))]) 
-
-        cifar10_train = CIFAR10(
-            root='cifar10/',
-            train=True,
-            download=True,
-            transform=transform)
-        
-        cifar10_test = CIFAR10(
-            root='cifar10/',
-            train=False,
-            download=True,
-            transform=transform)
-        
-        dataloader_train = DataLoader(cifar10_train, batch_size=batch_size, shuffle=True)
-        dataloader_test = DataLoader(cifar10_test, batch_size=batch_size, shuffle=True)
+        dataloader_train, dataloader_test = load_cifar10(ROOT_DATA)
 
     model.to(device)
-
 
     # finally start training on mnist
     train(

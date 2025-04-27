@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-class MaxOutMLP(nn.Module):
+class MaxOut(nn.Module):
     """
     Applies the maxout unit function (for multiplayer perceptrons),
     instead of applying an element-wise function,
