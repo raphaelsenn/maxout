@@ -4,10 +4,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-import torchvision.transforms as transforms
-from torchvision.datasets import MNIST, CIFAR10
-
 from experiments.neural_networks import MaxoutMLP
+from experiments.neural_networks import MaxoutConvNet
 
 from experiments.helpers import MaxNorm   # max-norm constraint
 from experiments.helpers import load_cifar10, load_mnist
@@ -15,7 +13,7 @@ from experiments.helpers import load_cifar10, load_mnist
 # -----------------------------------------------------------------------------
 # settings
 # -----------------------------------------------------------------------------
-DATASET = 'mnist'                 # mnist or cifar-10
+DATASET = 'cifar10'                 # mnist or cifar-10
 ROOT_DATA = DATASET + '/'
 
 lr = 0.01                         # learning rate
@@ -116,6 +114,7 @@ if __name__ == '__main__':
         dataloader_train, dataloader_test = load_mnist(ROOT_DATA)
 
     else: # training on cifar10
+        model = MaxoutConvNet() 
         dataloader_train, dataloader_test = load_cifar10(ROOT_DATA)
 
     model.to(device)

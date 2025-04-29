@@ -176,7 +176,9 @@ cython_debug/
 # Ignore personal notebook
 maxout_notes.ipynb
 notes_maxout.ipynb
+maxout_conv.ipynb
 
 # Ignore datasets
 mnist
 cifar10
+*.pt

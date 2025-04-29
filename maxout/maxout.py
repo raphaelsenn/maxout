@@ -36,10 +36,40 @@ class MaxOut(nn.Module):
              for layer in self.linear_layers] ,dim=1)
 
 
-# TODO: implemnt maxout for convolutional neural networks
 class MaxOutConv2d(nn.Module):
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            k_groups: int,
+            kernel_size: int,
+            padding: int,
+            stride: int,
+            pool_size: int,
+            pool_stride: int
+        ) -> None:
         super().__init__()
 
+        # assert out_channels % k_groups == 0, "Number of out_channels must be divisable by k_groups"
+        self.C = out_channels * k_groups
+        self.k_groups = k_groups
+
+        self.conv = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=k_groups*out_channels,
+            kernel_size=kernel_size,
+            padding=padding,
+            stride=stride
+        )
+        
+        self.pool = nn.MaxPool3d(
+            kernel_size=(k_groups, pool_size, pool_size),
+            stride=pool_stride
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = torch.max(x, dim=0)
+        x = self.conv(x)
+        x = x.view(x.shape[0], self.C // self.k_groups, self.k_groups, x.shape[2], x.shape[3])
+        x = self.pool(x)
+        x = x.view(x.shape[0], self.C // self.k_groups,x.shape[2], x.shape[3]) 
+        return x

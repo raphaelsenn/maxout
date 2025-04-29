@@ -2,9 +2,10 @@
 PyTorch implementation of the "Maxout unit/activation" described in the paper [Maxout Networks](https://arxiv.org/abs/1302.4389).
 
 ## The Maxout Unit
-Maxout units devide the input $x \in \mathbb{R}^d$ into groups of $k \in \mathbb{N}$ values. Each maxout unit then outputs the maximum element of one of these groups:
+Maxout units devide the input $x \in \mathbb{R}^d, d\in \mathbb{N}$ into groups of $k \in \mathbb{N}$ values. Each maxout unit then outputs the maximum element of one of these groups:
 
 ![image](res/maxout_unit.png)
+
 Taken from *Ian J. Goodfellow at al., 2013*,
 "Max Networks",
 *Proceedings of Machine Learning Research*, 2013
@@ -37,22 +38,24 @@ x = torch.rand(64, 3, 32, 32)   # N=64 samples, 3 channels, 32 x 32 input
 
 
 ```
+## Visualization of Maxout Networks
 
-## Experiments (replicated)
+![image](/res/2maxout_units.png)
+Taken from *Gabriel Castaneda at al., 2019*,
+"Evaluation of maxout activations in deep learning across several big data domains",
+*Journal of Big Data*, 2019
+
+![image](/res/cnn_maxout.png)
+Taken from *Gabriel Castaneda at al., 2019*,
+"Evaluation of maxout activations in deep learning across several big data domains",
+*Journal of Big Data*, 2019
+
+## Experiments
 
 ### MNIST (permutation invariant setting)
 The model they used consisted of two densly connected maxout layers, followed by a softmax layer.
 Sadly, they did not mention how many max-out units, and which k (to group and divide the input) was used. But the results from this architecture was more detailed described in the paper [Dropout: A Simple Way to Prevent Neural Networks from Overfitting](https://jmlr.org/papers/volume15/srivastava14a/srivastava14a.pdf) (Table 2).
 
-
-Original
-![image](/res/figure1.png)
-Taken from *Ian J. Goodfellow at al., 2013*,
-"Max Networks",
-*Proceedings of Machine Learning Research*, 2013
-
-Replication
-![image](/res/figure1_replica.png)
 
 ```bibtex
 @InProceedings{pmlr-v28-goodfellow13,
