@@ -19,24 +19,34 @@ import torch
 from maxout.maxout import Maxout
 
 
-x = torch.rand(64, 5)   # N=64 samples, 5 inputs
+input = torch.rand(64, 5)   # N=64 samples, 5 inputs
 
 # creating a maxout layer with 5 input and 3 output neurons
-
 maxout = Maxout(in_features=5, out_features=3, k_groups = 7)
 
-out = maxout(x)         # shape [64, 3]
+output = maxout(input)       # shape [64, 3]
 ```
 
 Convolutional neural networks
 
 ```python
 import torch
-from maxout.maxout import Conv2dMaxOut
-
-x = torch.rand(64, 3, 32, 32)   # N=64 samples, 3 channels, 32 x 32 input
+from maxout.maxout import Conv2dMaxout
 
 
+input = torch.rand(64, 3, 32, 32)   # N=64 samples, 3 channels, 32 x 32 input
+
+# creating a maxout convolution
+convmax = Conv2dMaxput(
+  in_channels=3,
+  out_channels=96,
+  k_groups=2,
+  kernel_size=8,
+  padding=4,
+  pool_size=4,
+  pool_stride=2)
+
+output = convmax(input)            # shape [64, 96, 15, 15]
 ```
 ## Visualization of Maxout Networks
 
