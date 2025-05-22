@@ -9,9 +9,11 @@ from torch.utils.data import DataLoader, TensorDataset
 from torchvision.transforms import transforms
 from torchvision.datasets import CIFAR10, MNIST
 
+
 ###############################################################################
 # MaxNorm weight constraint:
-###############################################################################
+
+BASE_EPSILON = 1e-8
 
 
 class MaxNorm(object):
@@ -19,16 +21,54 @@ class MaxNorm(object):
         self.max_value = max_value
         self.dim = dim
 
-    def __call__(self, m: nn.Module) -> None:
-        if hasattr(m, 'weight'):
-            norms = torch.norm(m.weight.data, dim=self.dim, keepdim=True)
-            w = m.weight.data.clamp(norms, self.max_value)
-            m.weight.data = w
+    def __call__(self, module: nn.Module):
+        if isinstance(module, (nn.Linear, nn.Conv2d)):
+            with torch.no_grad():
+                norms = torch.norm(module.weight, dim=self.dim, keepdim=True) 
+                desired = torch.clamp(norms, 0, self.max_value)
+                module.weight.data.mul_(desired / (BASE_EPSILON + norms))
+
+
+###############################################################################
+# MaxNorm weight constraint:
+
+
+class MomentumAdjuster:
+    def __init__(
+            self,
+            optimizer: nn.Module,
+            init_momentum: float,
+            final_momentum: float,
+            start_epoch: int=0,
+            saturate: int=5
+            ) -> None:
+        self.optimizer = optimizer 
+        self.init_momentum = init_momentum
+        self.final_momentum = final_momentum
+        self.start_epoch = start_epoch
+        self.staturate = saturate
+        self.current_epoch = 0
+
+    def _set_momentum(self, value):
+        for param_group in self.optimizer.param_groups:
+            if 'momentum' in param_group:
+                param_group['momentum'] = value
+
+    def step(self):
+        if self.current_epoch < self.start_epoch:
+            momentum = self.init_momentum
+        elif self.current_epoch >= self.saturate_epoch:
+            momentum = self.final_momentum
+        else:
+            progress = (self.current_epoch - self.start_epoch) / (self.saturate_epoch - self.start_epoch)
+            momentum = self.init_momentum + progress * (self.final_momentum - self.init_momentum)
+
+        self._set_momentum(momentum)
+        self.current_epoch += 1
 
 
 ###############################################################################
 # Contrast normalization and ZCA whitening for CIFAR10:
-###############################################################################
 
 
 def zca_whitening(X: torch.Tensor, epsilon: float=10e-7) -> None:
@@ -64,7 +104,6 @@ def zca_whitening(X: torch.Tensor, epsilon: float=10e-7) -> None:
 
 ###############################################################################
 # Load datasets (MNIST and CIFAR10):
-###############################################################################
 
 
 def load_cifar10(root: str, batch_size: int=64) -> tuple[DataLoader, DataLoader]:
