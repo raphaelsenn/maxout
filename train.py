@@ -4,50 +4,16 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from experiments.neural_networks import MaxoutMLP
-from experiments.neural_networks import MaxoutConvNet
-
-from experiments.helpers import MaxNorm             # max-norm constraint
-from experiments.helpers import MomentumAdjuster    # adjust momentum while training
-from experiments.helpers import load_cifar10, load_mnist
-
-"""
-Potential hyperparameters of the original paper:
-
-Max norm constant: 1.9365
-batch size: 100
-learning rate: 0.1
-start momemtun: 0.5
-init momentum: 0.7
-"""
-
-
-# -----------------------------------------------------------------------------
-# settings
-# -----------------------------------------------------------------------------
-DATASET = 'mnist'                 # mnist or cifar-10
-ROOT_DATA = DATASET + '/'
-
-lr = 0.1                            # init learning rate
-momentum = 0.5                      # init momentum
-epochs = 4                          # number of iterations
-c = 1.9365                          # max norm constraint
-batch_size = 64                     # batch size
-seed = 42                           # random seed for reproducability
-
-verbose = True                      # printing error/acc while training
-num_threads = 10                    # number of threads
-device = torch.device('mps')        # computing device i.e. cpu, cuda or mps
-
-torch.manual_seed(seed)
-torch.set_num_threads(num_threads)
+from experiments.mnist import MaxoutMLP
+from experiments.helpers import MaxNorm
+from experiments.helpers import load_mnist
 
 
 def evaluate(
         model: nn.Module,
         dataloader: DataLoader,
         device: torch.device
-        ) -> tuple[float, float]:
+    ) -> tuple[float, float]:
     model.eval() 
     correct = 0 
     with torch.no_grad():
@@ -63,53 +29,41 @@ def evaluate(
 
 def train(
         model: nn.Module,
+        optimizer,
+        criterion,
         dataloader: DataLoader,
         epochs: int,
-        lr: float,
-        momentum: float,
+        lamb: float,
+        c: float,
         device: torch.device,
-        verbose: bool
-        ) -> None:
+        verbose: bool,
+    ) -> None:
+
     model.train()
-    
-    optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=momentum)
-    criterion = nn.CrossEntropyLoss()
-    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.999996) 
-    momentum_adjuster = MomentumAdjuster(optimizer=optimizer, init_momentum=momentum, final_momentum=0.7, saturate=5)
     maxnorm = MaxNorm(max_value=c)
 
-    # for epoch in range(epochs):
     for epoch in range(epochs):
-
         total_loss, error = 0.0, 0.0
         start_time = time.monotonic()
         for X_batch, y_batch in dataloader:
             X_batch, y_batch = X_batch.to(device), y_batch.to(device)
             
-            # reset gradients 
             optimizer.zero_grad() 
-            
-            # make predictions
             pred = model.forward(X_batch)
-            
-            # calculate cross-entropy
             loss = criterion(pred, y_batch)
-            
-            # error measures (+loss) 
-            total_loss += loss.item()
-            error += torch.sum(y_batch != torch.argmax(pred, dim=1))
 
-            # backpropagation
+            # L2 weight decay 
+            l2_reg = torch.tensor(0.).to(device)
+            for param in model.parameters(): l2_reg += torch.sum(param**2)
+            loss += lamb * l2_reg
+
             loss.backward()
-
-            # update parameters
             optimizer.step()
-
-            # apply max-norm constraint
             model.apply(maxnorm)
+            
+            total_loss += loss.item() * X_batch.shape[0]
+            error += torch.sum(y_batch != torch.argmax(pred, dim=1))
         end_time = time.monotonic()
-        lr_scheduler.step()
-        momentum_adjuster.step()
 
         if verbose:
             total_loss = total_loss / len(dataloader.dataset) 
@@ -125,29 +79,42 @@ def train(
 
 
 if __name__ == '__main__':
-    if DATASET == 'mnist':  # training on minst
-        model = MaxoutMLP()
-        dataloader_train, dataloader_test = load_mnist(ROOT_DATA)
+    DATASET = 'mnist'
+    ROOT_DATA = DATASET + '/'
 
-    else: # training on cifar10
-        model = MaxoutConvNet() 
-        dataloader_train, dataloader_test = load_cifar10(ROOT_DATA)
+    hyper = {'lr': 0.0009261126249687733, 'beta1': 0.9177696863739093, 'beta2': 0.9677753053312056, 'lamb': 0.002797628859988094, 'c': 1.6648941117216467}
+    batch_size = 128
+    epochs = 50
     
+    model = MaxoutMLP()
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=hyper['lr'], betas=(hyper['beta1'], hyper['beta2']))
+    criterion = nn.CrossEntropyLoss() 
+
+    seed = 42
+    verbose = True                      # printing error/acc while training
+    num_threads = 10                    # number of threads
+    device = torch.device('mps')        # computing device i.e. cpu, cuda or mps
+    torch.manual_seed(seed)
+    torch.set_num_threads(num_threads) 
+    
+    dataloader_train, dataloader_test = load_mnist(ROOT_DATA, batch_size=batch_size)
+
     model.to(device)
     print(f'Start training on {DATASET} for {epochs} epochs\n'
           f'Using device: {device}\n'
-          f'Initial lr: {lr}\n'
-          f'Initial momentum: {momentum}\n'
+          f'Learning rate: {hyper['lr']}\n'
           f'Batch size: {batch_size}'
     )
     
     # finally start training on mnist
     train(
         model=model,
+        optimizer=optimizer,
+        criterion=criterion,
         dataloader=dataloader_train,
         epochs=epochs,
-        lr=lr,
-        momentum=momentum,
+        lamb=hyper['lamb'],
+        c=hyper['c'],
         device=device,
         verbose=True)
 

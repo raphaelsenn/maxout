@@ -5,13 +5,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import random_split
 
 from torchvision.transforms import transforms
 from torchvision.datasets import CIFAR10, MNIST
-
-
-###############################################################################
-# MaxNorm weight constraint:
 
 BASE_EPSILON = 1e-8
 
@@ -27,48 +24,6 @@ class MaxNorm(object):
                 norms = torch.norm(module.weight, dim=self.dim, keepdim=True) 
                 desired = torch.clamp(norms, 0, self.max_value)
                 module.weight.data.mul_(desired / (BASE_EPSILON + norms))
-
-
-###############################################################################
-# MaxNorm weight constraint:
-
-
-class MomentumAdjuster:
-    def __init__(
-            self,
-            optimizer: nn.Module,
-            init_momentum: float,
-            final_momentum: float,
-            start_epoch: int=0,
-            saturate: int=5
-            ) -> None:
-        self.optimizer = optimizer 
-        self.init_momentum = init_momentum
-        self.final_momentum = final_momentum
-        self.start_epoch = start_epoch
-        self.staturate = saturate
-        self.current_epoch = 0
-
-    def _set_momentum(self, value):
-        for param_group in self.optimizer.param_groups:
-            if 'momentum' in param_group:
-                param_group['momentum'] = value
-
-    def step(self):
-        if self.current_epoch < self.start_epoch:
-            momentum = self.init_momentum
-        elif self.current_epoch >= self.saturate_epoch:
-            momentum = self.final_momentum
-        else:
-            progress = (self.current_epoch - self.start_epoch) / (self.saturate_epoch - self.start_epoch)
-            momentum = self.init_momentum + progress * (self.final_momentum - self.init_momentum)
-
-        self._set_momentum(momentum)
-        self.current_epoch += 1
-
-
-###############################################################################
-# Contrast normalization and ZCA whitening for CIFAR10:
 
 
 def zca_whitening(X: torch.Tensor, epsilon: float=10e-7) -> None:
@@ -102,11 +57,7 @@ def zca_whitening(X: torch.Tensor, epsilon: float=10e-7) -> None:
     return torch.from_numpy(X_ZCA.reshape(X_ZCA.shape[0], 32, 32, 3).transpose(0, 3, 1, 2))
 
 
-###############################################################################
-# Load datasets (MNIST and CIFAR10):
-
-
-def load_cifar10(root: str, batch_size: int=64) -> tuple[DataLoader, DataLoader]:
+def load_cifar10(root: str, batch_size: int=64, validation_set: bool=False) -> tuple[DataLoader, DataLoader]:
     """
     Loads the CIFAR-10 dataset (with ZCA whitening) and returns a tuple of DataLoaders 
     for the training and test sets.
@@ -145,15 +96,16 @@ def load_cifar10(root: str, batch_size: int=64) -> tuple[DataLoader, DataLoader]
     return dataloader_train, dataloader_test
 
 
-def load_mnist(root: str, batch_size: int=64) -> tuple[DataLoader, DataLoader]:
+def load_mnist(root: str, batch_size: int=64, validation_set: bool=False
+    ) -> tuple:
     """
     Loads the MNIST dataset and returns a tuple of DataLoaders 
     for the training and test sets.
     """ 
-
-    transform = transforms.Compose(
-        [transforms.ToTensor(),                     # greyscale [0, 255] -> [0, 1]
-        transforms.Lambda(lambda x: x.view(-1))])   # shape [1, 28, 28] -> [1, 784]
+    transform = transforms.Compose([
+        transforms.ToTensor(),                     # greyscale [0, 255] -> [0, 1]
+        transforms.Lambda(lambda x: x.view(-1))    # shape [1, 28, 28] -> [1, 784]
+    ])
 
     mnist_train = MNIST(
         root=root,
@@ -166,7 +118,17 @@ def load_mnist(root: str, batch_size: int=64) -> tuple[DataLoader, DataLoader]:
         train=False,
         download=True,
         transform=transform)
-    
-    dataloader_train = DataLoader(mnist_train, batch_size=batch_size, shuffle=True)
-    dataloader_test = DataLoader(mnist_test, batch_size=batch_size, shuffle=True)
-    return dataloader_train, dataloader_test
+
+    if validation_set:
+        train_size = int(0.8 * len(mnist_train))
+        val_size = len(mnist_train) - train_size
+        train_set, val_set = random_split(mnist_train, [train_size, val_size])
+        
+        dataloader_train = DataLoader(train_set, batch_size, shuffle=True)
+        dataloader_val = DataLoader(val_set, batch_size, shuffle=False)
+        dataloader_test = DataLoader(mnist_test, batch_size=batch_size, shuffle=False)
+        return dataloader_train, dataloader_val, dataloader_test
+    else:
+        dataloader_train = DataLoader(mnist_train, batch_size=batch_size, shuffle=True)
+        dataloader_test = DataLoader(mnist_test, batch_size=batch_size, shuffle=False)
+        return dataloader_train, dataloader_test

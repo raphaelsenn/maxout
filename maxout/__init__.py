@@ -1,1 +1,1 @@
-from maxout.maxout import MaxOut
+from maxout.maxout import Maxout
